@@ -44,6 +44,7 @@ for emulating HP printers and plotters.''',
     entry_points = {
         'console_scripts': [
             'hpgl2svg = hpgl.cli:hpgl2svg',
+            'hprtl2bmp = hpgl.cli:hprtl2bmp',
         ],
     },
 )

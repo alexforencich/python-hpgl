@@ -56,3 +56,36 @@ def hpgl2svg(argv=None):
     imgf.write(generate_svg(paths))
 
     print("Done")
+
+def hprtl2bmp(argv=None):
+    import sys
+    from .hprtl import parse_hprtl
+    from .hprtl import generate_bmp
+
+    if argv is None:
+        argv = sys.argv
+
+    if len(argv) < 2:
+        print("Missing input file")
+        exit(1)
+
+    rtl_name = argv[1]
+    bmp_name = rtl_name + '.bmp'
+
+    if len(argv) > 2:
+        bmp_name = argv[2]
+    
+    print("Opening input HPRTL file '%s'" % rtl_name)
+    rtlf = open(rtl_name, 'rb')
+    print("Opening output BMP file '%s'" % bmp_name)
+    imgf = open(bmp_name, 'wb')
+
+    print("Parsing RTL")
+
+    plane_data = parse_hprtl(rtlf)
+
+    print("Writing BMP")
+
+    imgf.write(generate_bmp(plane_data))
+
+    print("Done")

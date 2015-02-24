@@ -25,3 +25,4 @@ THE SOFTWARE.
 __all__ = []
 
 from .hpgl import parse_hpgl, generate_svg, hpgl2svg
+from .hprtl import parse_hprtl, generate_bmp, hprtl2bmp
