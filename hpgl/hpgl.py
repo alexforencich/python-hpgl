@@ -56,7 +56,7 @@ def parse_hpgl(gl_file):
     labels = []
 
     if type(gl_file) == str:
-        glf = open(gl_file, 'rb')
+        glf = open(gl_file, 'r')
     else:
         glf = gl_file
 
