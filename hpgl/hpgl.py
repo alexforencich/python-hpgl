@@ -49,7 +49,7 @@ def parse_hpgl(gl_file):
     pen_width = 1
     stroke_weight = 0
 
-    label_term = chr(3)
+    label_term = '\x03'
     label_term_print = False
 
     paths = []
@@ -134,7 +134,7 @@ def parse_hpgl(gl_file):
                     cto_y = 0
                     pts.append((0,0,0,0))
                     break
-                while c == '-' or ord(c) >= 48 and ord(c) <= 57:
+                while c == '-' or '0' <= c <= '9':
                     s += c
                     c = glf.read(1)
 
@@ -142,7 +142,7 @@ def parse_hpgl(gl_file):
 
                 s = ''
                 c = glf.read(1)
-                while c == '-' or ord(c) >= 48 and ord(c) <= 57:
+                while c == '-' or '0' <= c <= '9':
                     s += c
                     c = glf.read(1)
 
@@ -164,12 +164,12 @@ def parse_hpgl(gl_file):
             tx = cto_x
             ty = cto_y
             while label_term_print or c != label_term:
-                if ord(c) == 8:
+                if c == '\x08':
                     cto_x -= char_rel_width * 3/2
-                elif ord(c) == 10:
+                elif c == '\x0A':
                     cto_x = tx
                     cto_y -= char_rel_height * 2
-                elif ord(c) < 32:
+                elif c < ' ':
                     pass
                 else:
                     labels.append((cur_x, cur_y, cto_x, cto_y, char_rel_width, char_rel_height, cur_pen, cur_font, c))
@@ -211,7 +211,7 @@ def parse_hpgl(gl_file):
             char_rel_width = 0.0075
             char_rel_height = 0.0075
 
-            label_term = chr(3)
+            label_term = '\x03'
             label_term_print = False
         elif cmd == 'IN':
             # init
@@ -229,7 +229,7 @@ def parse_hpgl(gl_file):
             char_rel_width = 0.0075
             char_rel_height = 0.0075
 
-            label_term = chr(3)
+            label_term = '\x03'
             label_term_print = False
         elif cmd == 'OP':
             # output P1 and P2 - ignored
