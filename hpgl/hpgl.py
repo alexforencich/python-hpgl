@@ -309,7 +309,7 @@ def generate_svg(paths):
     svg = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n'
     svg += '<!-- Created with python-hpgl (http://github.com/alexforencich/python-hpgl/) -->\n'
     svg += '<svg width="%d" height="%d" xmlns="http://www.w3.org/2000/svg" version="1.1">\n' % (max_x, max_y)
-    svg += '<style>path {fill: none; stroke-linecap: round; stroke-linejoin: round;}</style>'
+    svg += '<style>path {fill: none; stroke-linecap: round; stroke-linejoin: round;}</style>\n'
 
     for path in paths:
         pen, width, pts = path
