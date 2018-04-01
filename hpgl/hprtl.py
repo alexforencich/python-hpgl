@@ -231,76 +231,80 @@ def parse_hprtl(rtl_file):
                 # image row
                 l = int(cmd[1:-1])
 
-                # read row
-                d = rtlf.read(l)
+                if l > 0:
+                    # read row
+                    d = rtlf.read(l)
 
-                # skip if we are not in a raster section
-                if not in_raster:
-                    continue
+                    # skip if we are not in a raster section
+                    if not in_raster:
+                        continue
 
-                # set width if not yet set
-                # width must be set if compression enabled, otherwise
-                # all lines will be the same length
-                if width == 0:
-                    width = l * 8
+                    # set width if not yet set
+                    # width must be set if compression enabled, otherwise
+                    # all lines will be the same length
+                    if width == 0:
+                        width = l * 8
 
-                if byte_width == 0:
-                    byte_width = l
+                    if byte_width == 0:
+                        byte_width = l
 
-                if plane_data is None:
-                    plane_data = []
-                    for k in range(plane_cnt):
-                        plane_data.append([])
+                    if plane_data is None:
+                        plane_data = []
+                        for k in range(plane_cnt):
+                            plane_data.append([])
 
-                # add row if on first plane
-                if current_plane == 0:
-                    height += 1
+                    # add row if on first plane
+                    if current_plane == 0:
+                        height += 1
 
-                row = b''
+                    row = b''
 
-                if compression == 0:
-                    # unencoded (row)
-                    row += d
-                elif compression == 1:
-                    # run-length encoded (row)
-                    k = 0
-                    while True:
-                        if len(d) <= k:
-                            break
-                        h = d[k]
-                        k += 1
-                        row += d[k:k+1]*h
-                        k += 1
-                elif compression == 2:
-                    # TIFF 4.0 packbits (row)
-                    k = 0
-                    while True:
-                        if len(d) <= k:
-                            break
-                        h = d[k]
-                        k += 1
-                        if h == 128:
-                            continue
-                        if h < 128:
-                            row += d[k:k+h+1]
-                            k += h+1
-                        if h > 128:
-                            row += d[k:k+1]*(257-h)
+                    if compression == 0:
+                        # unencoded (row)
+                        row += d
+                    elif compression == 1:
+                        # run-length encoded (row)
+                        k = 0
+                        while True:
+                            if len(d) <= k:
+                                break
+                            h = d[k]
                             k += 1
+                            row += d[k:k+1]*h
+                            k += 1
+                    elif compression == 2:
+                        # TIFF 4.0 packbits (row)
+                        k = 0
+                        while True:
+                            if len(d) <= k:
+                                break
+                            h = d[k]
+                            k += 1
+                            if h == 128:
+                                continue
+                            if h < 128:
+                                row += d[k:k+h+1]
+                                k += h+1
+                            if h > 128:
+                                row += d[k:k+1]*(257-h)
+                                k += 1
+                    else:
+                        # something else; not implemented
+                        raise Exception("Invalid compression")
+
+                    # pad row to correct length
+                    row += b'\0' * (byte_width - len(row))
+
+                    # append row
+                    plane_data[current_plane].append(row)
+
+                    # go to next plane, if more than one plane
+                    if plane_cnt > 0:
+                        current_plane += 1
+                        if current_plane == plane_cnt or cb == ord('w') or cb == ord('W'):
+                            current_plane = 0
                 else:
-                    # something else; not implemented
-                    raise Exception("Invalid compression")
-
-                # pad row to correct length
-                row += b'\0' * (byte_width - len(row))
-
-                # append row
-                plane_data[current_plane].append(row)
-
-                # go to next plane, if more than one plane
-                if plane_cnt > 0:
-                    current_plane += 1
-                    if current_plane == plane_cnt or cb == ord('w') or cb == ord('W'):
+                    if cb == ord('w') or cb == ord('W'):
                         current_plane = 0
             else:
                 raise Exception("Invalid command (%s)" % (repr(cmd)))
