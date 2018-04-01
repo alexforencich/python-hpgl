@@ -42,7 +42,7 @@ def parse_hprtl(rtl_file):
 
     plane_data = None
 
-    in_raster = False
+    in_raster = True
 
     red = 0
     green = 0
@@ -173,12 +173,12 @@ def parse_hprtl(rtl_file):
                     raise Exception("Invalid color")
             elif ca == ord('r') and (cb == ord('a') or cb == ord('A')):
                 # start raster graphics
-                # if we missed the stop of one section, stop on the start of the next
-                if in_raster:
-                    in_raster = False
                 # only grab the first section
                 if height == 0:
                     in_raster = True
+                elif in_raster:
+                    # if we missed the stop of one section, stop on the start of the next
+                    in_raster = False
             elif ca == ord('r') and (cb == ord('c') or cb == ord('C')):
                 # end raster graphics
                 in_raster = False
