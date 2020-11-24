@@ -30,6 +30,7 @@ def parse_hpgl(gl_file):
     border = 10
 
     pen_down = False
+    drawn = False
     cur_pen = 1
     cur_x = 0
     cur_y = 0
@@ -73,9 +74,13 @@ def parse_hpgl(gl_file):
         if cmd == 'PU':
             # pen up
             pen_down = False
+            if not drawn:
+                # draw point
+                paths.append((cur_pen, pen_width, [(cur_x, cur_y, 0, 0)]))
         elif cmd == 'PD':
             # pen down
             pen_down = True
+            drawn = False
         elif cmd == 'SP':
             # select pen
             c = glf.read(1)
@@ -155,6 +160,7 @@ def parse_hpgl(gl_file):
 
             if pen_down:
                 paths.append((cur_pen, pen_width, pts))
+                drawn = True
         elif cmd == 'LB':
             # label
 
@@ -173,6 +179,7 @@ def parse_hpgl(gl_file):
                     pass
                 else:
                     labels.append((cur_x, cur_y, cto_x, cto_y, char_rel_width, char_rel_height, cur_pen, cur_font, c))
+                    drawn = True
                     cto_x += char_rel_width * 3/2
                     if c == label_term:
                         break
