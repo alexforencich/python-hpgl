@@ -324,7 +324,7 @@ def generate_svg(paths):
         if len(pts) == 1:
             svg += '<rect x="%0.1f" y="%0.1f" width="%d" height="%d" fill="%s" />\n' % (pts[0][0], pts[0][1], width, width, pen_color)
         else:
-            svg += '<path fill="none" stroke="%s" stroke-width="%d" d="M' % (pen_color, width)
+            svg += '<path fill="none" stroke="%s" stroke-width="%.3f" d="M' % (pen_color, width)
             first = True
             for p in pts:
                 if not first:
