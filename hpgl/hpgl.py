@@ -34,20 +34,32 @@ def parse_hpgl(gl_file):
     cur_pen = 1
     cur_x = 0
     cur_y = 0
-    cto_x = 0 # text offset
-    cto_y = 0
+    cur_cr_x = cur_x
+    cur_cr_y = cur_y
+
+    # page_size = (8900, 7350)  # letter (landscape)
+    # page_size = (7350, 8900)  # letter (portrait)
+    page_size = (10660, 7995)  # 7470
+
+    p1 = (0, 0)
+    p2 = page_size
+
+    scale = (1, 1)
+    offset = (0, 0)
 
     std_font = 48
     alt_font = 48
     cur_font = 48
 
     char_rel_width = 0.0075
-    char_rel_height = 0.0075
+    char_rel_height = 0.015
 
     char_abs_width = 0
     char_abs_height = 0
 
-    pen_width = 1
+    char_size_rel = False
+
+    pen_width = 40*0.35
     stroke_weight = 0
 
     label_term = '\x03'
@@ -97,6 +109,8 @@ def parse_hpgl(gl_file):
             cur_font = std_font
         elif cmd == 'SR':
             # specify relative character sizes
+            char_size_rel = True
+
             s = ''
             c = glf.read(1)
             while c != ',':
@@ -111,6 +125,11 @@ def parse_hpgl(gl_file):
             char_rel_height = float(s)/100.0
         elif cmd == 'SI':
             # specify absolute character sizes
+            char_size_rel = False
+
+            char_rel_width = 0.0075
+            char_rel_height = 0.015
+
             s = ''
             c = glf.read(1)
             while c != ',':
@@ -123,27 +142,74 @@ def parse_hpgl(gl_file):
                 s += c
                 c = glf.read(1)
             char_abs_height = float(s)
+        elif cmd == 'SC':
+            # scale
+            s = ''
+            c = glf.read(1)
+            while c != ';':
+                s += c
+                c = glf.read(1)
+            t = 0
+            s = s.split(',')
+            if len(s) == 0:
+                scale = (1, 1)
+                offset = (0, 0)
+            else:
+                if len(s) > 4:
+                    t = int(s[4])
+                if t == 1:
+                    # isotropic scaling
+                    xmin, xmax, ymin, ymax = (float(x) for x in s[0:4])
+                    if len(s) > 5:
+                        left = min(max(float(s[5])/100, 0), 1)
+                        bottom = min(max(float(s[6])/100, 0), 1)
+                    else:
+                        left = 0.5
+                        bottom = 0.5
+                    xfactor = (p2[0] - p1[0]) / (xmax - xmin)
+                    yfactor = (p2[1] - p1[1]) / (ymax - ymin)
+                    if xfactor < yfactor:
+                        # fill in x, align in y
+                        scale = (xfactor, xfactor)
+                        diff = p2[1] - p1[1] - (ymax - ymin) * scale
+                        offset = (p1[0] - xmin, p1[1] - ymin + diff*bottom)
+                    else:
+                        # fill in y, align in x
+                        scale = (yfactor, yfactor)
+                        diff = p2[0] - p1[0] - (xmax - xmin) * scale
+                        offset = (p1[0] - xmin + diff*left, p1[1] - ymin)
+                elif t == 2:
+                    # point factor
+                    # (xmin, ymin) -> p1
+                    xmin, xfactor, ymin, yfactor = (float(x) for x in s[0:4])
+                    scale = (xfactor, yfactor)
+                    offset = (p1[0] - xmin, p1[1] - ymin)
+                else:
+                    # anisotropic scaling
+                    # (xmin, ymin) -> p1, (xmax, ymax) -> p2
+                    xmin, xmax, ymin, ymax = (float(x) for x in s[0:4])
+                    xfactor = (p2[0] - p1[0]) / (xmax - xmin)
+                    yfactor = (p2[1] - p1[1]) / (ymax - ymin)
+                    scale = (xfactor, yfactor)
+                    offset = (p1[0] - xmin, p1[1] - ymin)
         elif cmd == 'PA':
             # plot absolute
 
             c = ''
-            pts = [(cur_x, cur_y, cto_x, cto_y)]
+            pts = [(cur_x, cur_y)]
 
             while c != ';':
                 s = ''
                 c = glf.read(1)
                 if c == ';':
-                    cur_x = 0
-                    cur_y = 0
-                    cto_x = 0
-                    cto_y = 0
-                    pts.append((0,0,0,0))
+                    # switch to absolute plotting
                     break
                 while c == '-' or '0' <= c <= '9':
                     s += c
                     c = glf.read(1)
 
-                cur_x = int(s)
+                # cur_x = int(s)
+                cur_x = (int(s)+offset[0])*scale[0]
 
                 s = ''
                 c = glf.read(1)
@@ -151,12 +217,13 @@ def parse_hpgl(gl_file):
                     s += c
                     c = glf.read(1)
 
-                cur_y = int(s)
+                # cur_y = int(s)
+                cur_y = (int(s)+offset[1])*scale[1]
 
-                cto_x = 0
-                cto_y = 0
+                cur_cr_x = cur_x
+                cur_cr_y = cur_y
 
-                pts.append((cur_x, cur_y, 0, 0))
+                pts.append((cur_x, cur_y))
 
             if pen_down:
                 paths.append((cur_pen, pen_width, pts))
@@ -165,22 +232,30 @@ def parse_hpgl(gl_file):
             # label
 
             c = glf.read(1)
-            x = cur_x
-            y = cur_y
-            tx = cto_x
-            ty = cto_y
+
+            if char_size_rel:
+                char_width = char_rel_width * (p2[0]-p1[0])
+                char_height = char_rel_height * (p2[1]-p1[1])
+            else:
+                char_width = char_abs_width
+                char_height = char_abs_height
+
             while label_term_print or c != label_term:
                 if c == '\x08':
-                    cto_x -= char_rel_width * 3/2
-                elif c == '\x0A':
-                    cto_x = tx
-                    cto_y -= char_rel_height * 2
+                    cur_x -= char_width * 3/2
+                elif c == '\r':
+                    cur_x = cur_cr_x
+                    cur_y = cur_cr_y
+                elif c == '\n':
+                    cur_cr_y -= char_height * 2
+                    cur_x = cur_cr_x
+                    cur_y = cur_cr_y
                 elif c < ' ':
                     pass
                 else:
-                    labels.append((cur_x, cur_y, cto_x, cto_y, char_rel_width, char_rel_height, cur_pen, cur_font, c))
+                    labels.append((cur_x, cur_y, char_width, char_height, cur_pen, cur_font, c))
                     drawn = True
-                    cto_x += char_rel_width * 3/2
+                    cur_x += char_width * 3/2
                     if c == label_term:
                         break
                 c = glf.read(1)
@@ -208,15 +283,15 @@ def parse_hpgl(gl_file):
             cur_pen = 1
             cur_x = 0
             cur_y = 0
-            cto_x = 0
-            cto_y = 0
+            cur_cr_x = cur_x
+            cur_cr_y = cur_y
 
             std_font = 48
             alt_font = 48
             cur_font = 48
 
             char_rel_width = 0.0075
-            char_rel_height = 0.0075
+            char_rel_height = 0.015
 
             label_term = '\x03'
             label_term_print = False
@@ -226,62 +301,63 @@ def parse_hpgl(gl_file):
             cur_pen = 1
             cur_x = 0
             cur_y = 0
-            cto_x = 0
-            cto_y = 0
+            cur_cr_x = cur_x
+            cur_cr_y = cur_y
 
             std_font = 48
             alt_font = 48
             cur_font = 48
 
             char_rel_width = 0.0075
-            char_rel_height = 0.0075
+            char_rel_height = 0.015
 
             label_term = '\x03'
             label_term_print = False
+        elif cmd == 'IP':
+            # input P1 and P2 (absolute)
+            s = ''
+            c = glf.read(1)
+            while c != ';':
+                s += c
+                c = glf.read(1)
+            s = [float(x) for x in s.split(',')]
+            if len(s) == 2:
+                # set p1, move p2 to keep same x,y offset
+                d = tuple(map(lambda i, j: i - j, p2, p1))
+                p1 = (s[0], s[1])
+                p2 = tuple(map(lambda i, j: i + j, p1, d))
+            elif len(s) == 4:
+                # set p1 and p2
+                p1 = (s[0], s[1])
+                p2 = (s[2], s[3])
+        elif cmd == 'IR':
+            # input P1 and P2 (relative)
+            s = ''
+            c = glf.read(1)
+            while c != ';':
+                s += c
+                c = glf.read(1)
+            s = [float(x)/100 for x in s.split(',')]
+            if len(s) == 2:
+                # set p1, move p2 to keep same x,y offset
+                d = tuple(map(lambda i, j: i - j, p2, p1))
+                p1 = (s[0]*page_size[0], s[1]*page_size[1])
+                p2 = tuple(map(lambda i, j: i + j, p1, d))
+            elif len(s) == 4:
+                # set p1 and p2
+                p1 = (s[0]*page_size[0], s[1]*page_size[1])
+                p2 = (s[2]*page_size[0], s[3]*page_size[1])
         elif cmd == 'OP':
             # output P1 and P2 - ignored
             pass
         else:
             raise Exception("Unknown HPGL command (%s)" % cmd)
 
-    # determine size
-    max_x = 0
-    max_y = 0
-
-    # max extent of vector graphics
-    for path in paths:
-        pen, width, pts = path
-        for p in pts:
-            max_x = max(p[0], max_x)
-            max_y = max(p[1], max_y)
-
-    # max extent of text
-    for lb in labels:
-        max_x = max(lb[0]/(1-(lb[2]+lb[4])), max_x)
-        max_y = max(lb[1]/(1-(lb[3]+lb[5])), max_y)
-
-    max_x = round(max_x+0.5)
-    max_y = round(max_y+0.5)
-
-    # add text offsets
-    paths2 = []
-    for path in paths:
-        pen, width, pts = path
-        pts2 = []
-        for p in pts:
-            pts2.append((p[0] + p[2]*max_x, p[1] + p[3]*max_y))
-        paths2.append((pen, width, pts2))
-    paths = paths2
-
     # render text
     for lb in labels:
-        x, y, tx, ty, cw, ch, pen, font, c = lb
-        width = cw*max_x
-        height = ch*max_y
-        x += tx*max_x
-        y += ty*max_y
+        x, y, cw, ch, pen, font, c = lb
         if stroke_weight < 9999:
-            pw = 0.1 * min(height, 1.5*width) * 1.13**stroke_weight
+            pw = 0.1 * min(ch, 1.5*cw) * 1.13**stroke_weight
         else:
             pw = pen_width
         if c in stick_font:
@@ -289,8 +365,21 @@ def parse_hpgl(gl_file):
             for pts in chr_paths:
                 path = []
                 for p in pts:
-                    path.append((p[0]/4*width+x, p[1]/8*height+y))
+                    path.append((p[0]/4*cw+x, p[1]/8*cw+y))
                 paths.append((pen, pw, path))
+
+    # determine size
+    max_x = 0
+    max_y = 0
+
+    for path in paths:
+        pen, width, pts = path
+        for p in pts:
+            max_x = max(p[0], max_x)
+            max_y = max(p[1], max_y)
+
+    max_x = round(max_x+0.5)
+    max_y = round(max_y+0.5)
 
     max_x += border*2
     max_y += border*2
