@@ -43,7 +43,7 @@ def hpgl2svg(argv=None):
         svg_name = argv[2]
 
     print("Opening input HPGL file '%s'" % hpgl_name)
-    hpglf = open(hpgl_name, 'r')
+    hpglf = open(hpgl_name, 'r', newline='')
     print("Opening output SVG file '%s'" % svg_name)
     imgf = open(svg_name, 'w')
 
